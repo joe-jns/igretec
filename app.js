@@ -123,6 +123,7 @@ function setupFirebaseSync(dsId) {
       _lastOwnPush = Date.now();
       _fbRef.set(stateToFb(state)).catch(() => {});
       applyFilters();
+      updateResumeBtn();
       updateSyncDot('ok');
       return;
     }
@@ -133,6 +134,7 @@ function setupFirebaseSync(dsId) {
       state = merged;
       localStorage.setItem(currentStorageKey(), JSON.stringify(state));
       applyFilters();
+      updateResumeBtn();
       if (!isOwnEcho) showToast('Ton ami a mis à jour des entreprises');
     }
     updateSyncDot('ok');
