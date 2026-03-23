@@ -689,6 +689,61 @@ td.col-tel a:hover { opacity: 0.7; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-med); }
 
+/* ── Custom tooltips ───────────────────────────────────────────── */
+[data-tip] { position: relative; }
+
+[data-tip]::before {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  background: #18181b;
+  color: #f4f4f5;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.45;
+  padding: 7px 11px;
+  border-radius: 8px;
+  white-space: nowrap;
+  max-width: 220px;
+  white-space: normal;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 500;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+[data-tip]::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  border: 5px solid transparent;
+  border-top-color: #18181b;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 500;
+}
+
+[data-tip]:hover::before,
+[data-tip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+[data-tip-danger]::before {
+  background: #7f1d1d;
+  border-color: rgba(255,255,255,0.08);
+}
+[data-tip-danger]::after { border-top-color: #7f1d1d; }
+
 @media (max-width: 768px) {
   header { padding: 0 16px; }
   .header-progress { display: none; }
@@ -772,8 +827,8 @@ td.col-tel a:hover { opacity: 0.7; }
 <!-- CONTROLS -->
 <div class="controls">
   <div class="dataset-switcher">
-    <select id="ds-select" class="ctrl-select ds-select" onchange="switchDataset(this.value)" title="Changer de liste de prospection"></select>
-    <button class="btn btn-new-ds" onclick="openImportModal()" title="Importer un nouveau dataset CSV">
+    <select id="ds-select" class="ctrl-select ds-select" onchange="switchDataset(this.value)" data-tip="Changer de liste de prospection"></select>
+    <button class="btn btn-new-ds" onclick="openImportModal()" data-tip="Importer un nouveau dataset CSV">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
@@ -790,7 +845,7 @@ td.col-tel a:hover { opacity: 0.7; }
     <input type="text" id="search" placeholder="Rechercher nom, activité, localité…" oninput="applyFilters()">
   </div>
 
-  <button class="btn btn-export" onclick="exportCSV()" title="Exporte les entreprises du dataset actuel (filtrées si un filtre est actif) en fichier CSV">
+  <button class="btn btn-export" onclick="exportCSV()" data-tip="Exporte les entreprises visibles en CSV (respecte les filtres actifs)">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
       <polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/>
@@ -798,7 +853,7 @@ td.col-tel a:hover { opacity: 0.7; }
     Export CSV
   </button>
 
-  <button class="btn btn-reset" onclick="confirmReset()" title="Remet à zéro toute la progression du dataset actuel — ton ami perdra aussi ses données">
+  <button class="btn btn-reset" onclick="confirmReset()" data-tip="Remet à zéro toute la progression — affecte aussi ton ami" data-tip-danger>
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="1,4 1,10 7,10"/>
       <path d="M3.51 15a9 9 0 1 0 .49-3.84"/>
@@ -807,7 +862,7 @@ td.col-tel a:hover { opacity: 0.7; }
   </button>
 
   <div style="display:flex;align-items:center;gap:7px;margin-left:auto;padding-left:12px;border-left:1px solid var(--border)">
-    <span id="sync-dot" title="Connexion…" style="width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0;transition:background 0.3s"></span>
+    <span id="sync-dot" data-tip="Connexion en cours…" style="width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0;transition:background 0.3s;cursor:default"></span>
     <span style="font-size:0.73rem;color:var(--muted);font-family:var(--font-ui);font-weight:600;white-space:nowrap">Sync Firebase</span>
   </div>
 </div>
@@ -951,7 +1006,7 @@ function setupFirebaseSync(dsId) {
 function updateSyncDot(status) {
   const dot = document.getElementById('sync-dot');
   if (!dot) return;
-  dot.title = status === 'ok' ? 'Synchronisé' : status === 'saving' ? 'Sauvegarde…' : 'Erreur Firebase';
+  dot.dataset.tip = status === 'ok' ? 'Synchronisé avec Firebase' : status === 'saving' ? 'Sauvegarde en cours…' : 'Erreur de connexion Firebase';
   dot.style.background = status === 'ok' ? '#22c55e' : status === 'saving' ? '#f59e0b' : '#ef4444';
 }
 // ────────────────────────────────────────────────────────────────────────────
