@@ -162,7 +162,6 @@ function setupFirebaseSync(dsId) {
       _lastOwnPush = Date.now();
       _fbRef.set(stateToFb(state)).catch(() => {});
       applyFilters(true);
-      updateResumeBtn();
       updateSyncDot('ok');
       return;
     }
@@ -173,7 +172,6 @@ function setupFirebaseSync(dsId) {
       state = merged;
       localStorage.setItem(currentStorageKey(), JSON.stringify(state));
       applyFilters(true);
-      updateResumeBtn();
       if (!isOwnEcho) showToast('Ton ami a mis à jour des entreprises');
     }
     updateSyncDot('ok');
@@ -371,6 +369,7 @@ function applyFilters(keepPage = false) {
   renderTable();
   renderPagination();
   updateStats();
+  updateResumeBtn();
 }
 
 function sortBy(col) {
