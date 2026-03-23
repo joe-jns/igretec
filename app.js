@@ -727,7 +727,14 @@ function toggleFocusMode() {
   const btn = document.getElementById('btn-focus');
   overlay.style.display = focusMode ? 'flex' : 'none';
   btn.classList.toggle('active', focusMode);
-  if (focusMode) { focusIndex = 0; renderFocusCard(); }
+  if (focusMode) {
+    focusIndex = 0;
+    if (lastModifiedKey) {
+      const idx = filteredData.findIndex(c => getKey(c) === lastModifiedKey);
+      if (idx !== -1) focusIndex = Math.min(idx + 1, filteredData.length - 1);
+    }
+    renderFocusCard();
+  }
 }
 
 function renderFocusCard() {
