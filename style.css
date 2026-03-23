@@ -863,12 +863,17 @@ tr:hover .menu-dots-btn { opacity: 1; }
 }
 .focus-close:hover { color: var(--text); }
 
+@keyframes slide-in-right  { from { opacity:0; transform: translateX(48px);  } to { opacity:1; transform: translateX(0); } }
+@keyframes slide-in-left   { from { opacity:0; transform: translateX(-48px); } to { opacity:1; transform: translateX(0); } }
+
 .focus-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
   padding: 48px 56px; width: 100%; max-width: 620px; text-align: center;
   box-shadow: 0 8px 40px rgba(0,0,0,0.06);
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
+.focus-card.slide-next { animation: slide-in-right 0.22s cubic-bezier(0.16,1,0.3,1) both; }
+.focus-card.slide-prev { animation: slide-in-left  0.22s cubic-bezier(0.16,1,0.3,1) both; }
 .focus-badge {
   font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 20px;
   font-family: var(--font-ui); min-height: 22px;

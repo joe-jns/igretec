@@ -825,7 +825,7 @@ function toggleFocusMode() {
   }
 }
 
-function renderFocusCard() {
+function renderFocusCard(dir) {
   const c = filteredData[focusIndex];
   if (!c) return;
   const key    = getKey(c);
@@ -833,6 +833,13 @@ function renderFocusCard() {
   const status = s.status || 'pending';
 
   document.getElementById('focus-counter').textContent = `${focusIndex + 1} / ${filteredData.length}`;
+
+  if (dir) {
+    const card = document.getElementById('focus-card');
+    card.classList.remove('slide-next', 'slide-prev');
+    void card.offsetWidth; // reflow pour relancer l'animation
+    card.classList.add(dir === 'next' ? 'slide-next' : 'slide-prev');
+  }
 
   // Badge
   const badge = document.getElementById('focus-status-badge');
@@ -878,7 +885,7 @@ function renderFocusCard() {
 
 function focusMove(dir) {
   focusIndex = Math.max(0, Math.min(filteredData.length - 1, focusIndex + dir));
-  renderFocusCard();
+  renderFocusCard(dir > 0 ? 'next' : 'prev');
 }
 
 function focusAction(action) {
