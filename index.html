@@ -695,54 +695,29 @@ td.col-tel a:hover { opacity: 0.7; }
 [data-tip]::before {
   content: attr(data-tip);
   position: absolute;
-  bottom: calc(100% + 10px);
+  bottom: calc(100% + 8px);
   left: 50%;
-  transform: translateX(-50%) translateY(6px);
-  background: #18181b;
+  transform: translateX(-50%) translateY(4px);
+  background: rgba(24,24,27,0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   color: #f4f4f5;
   font-family: var(--font-ui);
   font-size: 0.72rem;
   font-weight: 500;
-  line-height: 1.45;
-  padding: 7px 11px;
-  border-radius: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
   white-space: nowrap;
-  max-width: 220px;
-  white-space: normal;
-  text-align: center;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.18s ease, transform 0.18s ease;
-  z-index: 500;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-  border: 1px solid rgba(255,255,255,0.06);
-}
-
-[data-tip]::after {
-  content: '';
-  position: absolute;
-  bottom: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%) translateY(6px);
-  border: 5px solid transparent;
-  border-top-color: #18181b;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease;
   z-index: 500;
 }
 
-[data-tip]:hover::before,
-[data-tip]:hover::after {
+[data-tip]:hover::before {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
-
-[data-tip-danger]::before {
-  background: #7f1d1d;
-  border-color: rgba(255,255,255,0.08);
-}
-[data-tip-danger]::after { border-top-color: #7f1d1d; }
 
 @media (max-width: 768px) {
   header { padding: 0 16px; }
