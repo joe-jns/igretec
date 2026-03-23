@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Igretec — Prospection PAE</title>
 <script src="data.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -318,6 +320,33 @@ select.ctrl-select:focus { border-color: var(--accent); }
   border-color: var(--accent);
 }
 .btn-export:hover { background: #a33509; border-color: #a33509; }
+
+.btn-save-state {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.btn-save-state:hover { opacity: 0.85; }
+
+.btn-load-state {
+  cursor: pointer;
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  height: 34px;
+  border-radius: 8px;
+  border-width: 1px;
+  border-style: solid;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+.btn-load-state:hover { border-color: var(--blue); color: var(--blue); }
 .btn-reset {
   background: var(--surface);
   color: var(--text-2);
@@ -711,6 +740,23 @@ td.col-tel a:hover { opacity: 0.7; }
     Export CSV
   </button>
 
+  <button class="btn btn-save-state" onclick="exportState()" title="Exporter la progression pour la partager ou la commiter sur GitHub">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+      <polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/>
+    </svg>
+    Sauvegarder
+  </button>
+
+  <label class="btn btn-load-state" title="Importer une progression (fusionne avec la locale)">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="17,14 12,9 7,14"/><line x1="12" y1="9" x2="12" y2="21"/>
+      <path d="M20 5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2"/>
+    </svg>
+    Importer
+    <input type="file" accept=".json" style="display:none" onchange="importState(event)">
+  </label>
+
   <button class="btn btn-reset" onclick="resetAll()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="1,4 1,10 7,10"/>
@@ -718,6 +764,11 @@ td.col-tel a:hover { opacity: 0.7; }
     </svg>
     Réinitialiser
   </button>
+
+  <div style="display:flex;align-items:center;gap:7px;margin-left:auto;padding-left:12px;border-left:1px solid var(--border)">
+    <span id="sync-dot" title="Connexion…" style="width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0;transition:background 0.3s"></span>
+    <span style="font-size:0.73rem;color:var(--muted);font-family:var(--font-ui);font-weight:600;white-space:nowrap">Sync Firebase</span>
+  </div>
 </div>
 
 <!-- RESULTS BAR -->
@@ -771,7 +822,133 @@ const BADGE_CONFIG = {
 
 function getKey(c) { return c.tva || c.nom; }
 function loadState() { try { state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { state = {}; } }
-function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+// ── Firebase Realtime Sync ──────────────────────────────────────────────────
+const _fbConfig = {
+  apiKey: "AIzaSyBg6jOokg-mlQot4rMRakbB2YqWVzqr-kA",
+  authDomain: "prospection-dashboard.firebaseapp.com",
+  databaseURL: "https://prospection-dashboard-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "prospection-dashboard",
+  storageBucket: "prospection-dashboard.firebasestorage.app",
+  messagingSenderId: "686505352594",
+  appId: "1:686505352594:web:1c40bf7db740934327754b"
+};
+firebase.initializeApp(_fbConfig);
+const _db    = firebase.database();
+const _fbRef = _db.ref('prospection_state');
+
+let _fbInitDone    = false;
+let _lastOwnPush   = 0;   // timestamp de notre dernier push
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  _lastOwnPush = Date.now();
+  _fbRef.set(state).catch(e => console.warn('Firebase save:', e));
+  updateSyncDot('saving');
+}
+
+// Listener temps réel
+_fbRef.on('value', snapshot => {
+  const remote = snapshot.val() || {};
+
+  if (!_fbInitDone) {
+    _fbInitDone = true;
+    // Première connexion : fusionner local + Firebase et uploader le résultat
+    const merged = mergeStates(state, remote);
+    state = merged;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    _lastOwnPush = Date.now();
+    _fbRef.set(state).catch(() => {});
+    applyFilters();
+    updateSyncDot('ok');
+    return;
+  }
+
+  // Echo de notre propre push (< 3 s) → on ignore le toast mais on re-render si besoin
+  const isOwnEcho = (Date.now() - _lastOwnPush) < 3000;
+  const merged = mergeStates(state, remote);
+  const changed = JSON.stringify(merged) !== JSON.stringify(state);
+
+  if (changed) {
+    state = merged;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    applyFilters();
+    if (!isOwnEcho) showToast('Ton ami a mis à jour des entreprises');
+  }
+  updateSyncDot('ok');
+}, err => { updateSyncDot('err'); });
+
+function updateSyncDot(status) {
+  const dot = document.getElementById('sync-dot');
+  if (!dot) return;
+  dot.title = status === 'ok' ? 'Synchronisé' : status === 'saving' ? 'Sauvegarde…' : 'Erreur Firebase';
+  dot.style.background = status === 'ok' ? '#22c55e' : status === 'saving' ? '#f59e0b' : '#ef4444';
+}
+// ────────────────────────────────────────────────────────────────────────────
+
+// Fusionne deux états : garde le plus "avancé" pour chaque entreprise
+function mergeStates(base, incoming) {
+  const priority = { interested: 3, skip: 2, reviewed: 1, pending: 0 };
+  const merged = Object.assign({}, base);
+  for (const key of Object.keys(incoming)) {
+    const a = base[key] || {};
+    const b = incoming[key] || {};
+    const aP = priority[a.status] ?? -1;
+    const bP = priority[b.status] ?? -1;
+    merged[key] = {
+      status: bP > aP ? (b.status || 'pending') : (a.status || 'pending'),
+      note: (b.note && (!a.note || b.note.length > a.note.length)) ? b.note : (a.note || ''),
+    };
+    if ((!merged[key].status || merged[key].status === 'pending') && !merged[key].note) delete merged[key];
+  }
+  return merged;
+}
+
+// Export de l'état complet en state.json → à commiter sur GitHub
+function exportState() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'state.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Import depuis un fichier state.json (fusion avec localStorage)
+function importState(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const incoming = JSON.parse(e.target.result);
+      const before = Object.keys(state).length;
+      state = mergeStates(state, incoming);
+      saveState();
+      applyFilters();
+      const after = Object.keys(state).length;
+      showToast(`Fusion OK — ${after} entrées (avant: ${before})`);
+    } catch(err) {
+      showToast('Erreur : fichier JSON invalide');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 20px;border-radius:10px;font-size:0.82rem;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.2s;pointer-events:none;font-family:var(--font-ui)';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
+}
 
 loadState();
 populatePaeFilter();
