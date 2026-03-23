@@ -294,6 +294,12 @@ select.ctrl-select {
   max-width: 220px;
 }
 select.ctrl-select:focus { border-color: var(--accent); }
+select.ds-select {
+  min-width: 200px;
+  max-width: 280px;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
 
 .controls-sep { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
 
@@ -347,6 +353,54 @@ select.ctrl-select:focus { border-color: var(--accent); }
   transition: all 0.15s;
 }
 .btn-load-state:hover { border-color: var(--blue); color: var(--blue); }
+
+.dataset-switcher { display: flex; align-items: center; gap: 6px; }
+.btn-new-ds {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 0 12px; height: 34px; border-radius: 8px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); cursor: pointer;
+  font-family: var(--font-ui); font-size: 0.8rem; font-weight: 600;
+  transition: all 0.15s;
+}
+.btn-new-ds:hover { border-color: var(--blue); color: var(--blue); }
+
+/* Modal import CSV */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1000;
+  display: flex; align-items: center; justify-content: center; backdrop-filter: blur(3px);
+}
+.modal-box {
+  background: var(--surface); border-radius: 16px; padding: 32px;
+  width: 540px; max-width: 95vw; max-height: 85vh; overflow-y: auto;
+  border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+}
+.modal-title { font-family: var(--font-ui); font-size: 1.05rem; font-weight: 800; color: var(--text); margin: 0 0 4px; }
+.modal-sub { font-size: 0.8rem; color: var(--muted); margin: 0 0 24px; }
+.modal-label { font-family: var(--font-ui); font-size: 0.78rem; font-weight: 700; color: var(--text-2); display: block; margin-bottom: 6px; }
+.modal-input {
+  width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface2);
+  font-family: var(--font-ui); font-size: 0.85rem; color: var(--text);
+  outline: none; transition: border-color 0.15s;
+}
+.modal-input:focus { border-color: var(--blue); }
+.modal-drop {
+  border: 2px dashed var(--border); border-radius: 10px; padding: 28px;
+  text-align: center; cursor: pointer; transition: all 0.15s; margin-top: 8px;
+  color: var(--muted); font-size: 0.85rem; font-family: var(--font-ui);
+}
+.modal-drop:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-bg); }
+.modal-drop.has-file { border-color: var(--blue); color: var(--blue); background: var(--blue-bg); }
+.col-map-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.col-map-item label { font-size: 0.74rem; font-weight: 700; color: var(--text-2); display: block; margin-bottom: 4px; }
+.col-map-item select { width: 100%; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface2); font-size: 0.8rem; font-family: var(--font-ui); }
+.modal-actions { display: flex; gap: 10px; margin-top: 24px; justify-content: flex-end; }
+.btn-modal-cancel { padding: 9px 20px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: var(--font-ui); font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+.btn-modal-ok { padding: 9px 20px; border-radius: 8px; border: none; background: var(--blue); color: #fff; font-family: var(--font-ui); font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.btn-modal-ok:disabled { opacity: 0.4; cursor: default; }
+.preview-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.75rem; max-height: 160px; overflow-y: auto; display: block; }
+.preview-table th { background: var(--surface2); padding: 5px 8px; text-align: left; font-weight: 700; color: var(--text-2); border-bottom: 1px solid var(--border); }
+.preview-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); color: var(--text); white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
 .btn-reset {
   background: var(--surface);
   color: var(--text-2);
@@ -658,7 +712,7 @@ td.col-tel a:hover { opacity: 0.7; }
       </svg>
     </div>
     <div class="logo-text">
-      <h1>Igretec PAE</h1>
+      <h1 id="header-ds-name">Prospection</h1>
       <span>Prospection commerciale</span>
     </div>
   </div>
@@ -666,7 +720,7 @@ td.col-tel a:hover { opacity: 0.7; }
   <div class="header-progress">
     <div class="progress-labels">
       <span class="progress-label-left">Progression</span>
-      <span class="progress-label-right" id="progress-label-right">0 / 705</span>
+      <span class="progress-label-right" id="progress-label-right">0 / 0</span>
     </div>
     <div class="progress-track">
       <div class="progress-fill" id="progress-bar"></div>
@@ -717,6 +771,16 @@ td.col-tel a:hover { opacity: 0.7; }
 
 <!-- CONTROLS -->
 <div class="controls">
+  <div class="dataset-switcher">
+    <select id="ds-select" class="ctrl-select ds-select" onchange="switchDataset(this.value)"></select>
+    <button class="btn btn-new-ds" onclick="openImportModal()" title="Importer un nouveau dataset CSV">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Dataset
+    </button>
+  </div>
+  <div class="controls-sep"></div>
   <div class="search-wrap">
     <span class="search-icon">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -725,12 +789,6 @@ td.col-tel a:hover { opacity: 0.7; }
     </span>
     <input type="text" id="search" placeholder="Rechercher nom, activité, localité…" oninput="applyFilters()">
   </div>
-
-  <select id="filter-pae" class="ctrl-select" onchange="applyFilters()">
-    <option value="">Tous les PAE</option>
-  </select>
-
-  <div class="controls-sep"></div>
 
   <button class="btn btn-export" onclick="exportCSV()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -806,12 +864,32 @@ td.col-tel a:hover { opacity: 0.7; }
 </div>
 
 <script>
-const STORAGE_KEY = 'igretec_prospection_v1';
+// ── Dataset management ───────────────────────────────────────────────────────
+const DS_META_KEY   = 'igretec_ds_meta_v1';
+const DS_DATA_PFX   = 'igretec_ds_data_';
+const DS_STATE_PFX  = 'igretec_ds_state_';
+const LEGACY_KEY    = 'igretec_prospection_v1'; // clé existante igretec
+
+let dsMeta = {};          // { id: { name, isBuiltIn } }
+let currentDsId = 'igretec';
+let ACTIVE_COMPANIES = COMPANIES; // tableau actif — COMPANIES vient de data.js
+
+function currentStorageKey() {
+  return currentDsId === 'igretec' ? LEGACY_KEY : DS_STATE_PFX + currentDsId;
+}
+function loadDsMeta() {
+  try { dsMeta = JSON.parse(localStorage.getItem(DS_META_KEY) || '{}'); } catch(e) { dsMeta = {}; }
+  if (!dsMeta.igretec) dsMeta.igretec = { name: 'Igretec PAE', isBuiltIn: true };
+}
+function saveDsMeta() { localStorage.setItem(DS_META_KEY, JSON.stringify(dsMeta)); }
+// ─────────────────────────────────────────────────────────────────────────────
+
 let state = {};
 let sortCol = 'nom';
 let sortDir = 1;
 let filteredData = [];
 let activeCardFilter = '';
+let _csvParsed = null;
 
 const BADGE_CONFIG = {
   pending:    { label: 'À traiter',       dot: true },
@@ -821,7 +899,7 @@ const BADGE_CONFIG = {
 };
 
 function getKey(c) { return c.tva || c.nom; }
-function loadState() { try { state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { state = {}; } }
+function loadState() { try { state = JSON.parse(localStorage.getItem(currentStorageKey()) || '{}'); } catch(e) { state = {}; } }
 
 // Firebase n'accepte pas . # $ / [ ] dans les clés → on encode/décode
 function fbEncode(k) { return k.replace(/\./g,'__d__').replace(/#/g,'__h__').replace(/\$/g,'__s__').replace(/\//g,'__sl__').replace(/\[/g,'__lb__').replace(/\]/g,'__rb__'); }
@@ -840,49 +918,52 @@ const _fbConfig = {
   appId: "1:686505352594:web:1c40bf7db740934327754b"
 };
 firebase.initializeApp(_fbConfig);
-const _db    = firebase.database();
-const _fbRef = _db.ref('prospection_state');
+const _db = firebase.database();
 
+let _fbRef         = null;
+let _fbListener    = null;
 let _fbInitDone    = false;
-let _lastOwnPush   = 0;   // timestamp de notre dernier push
+let _lastOwnPush   = 0;
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(currentStorageKey(), JSON.stringify(state));
   _lastOwnPush = Date.now();
-  _fbRef.set(stateToFb(state)).catch(e => console.warn('Firebase save:', e));
+  if (_fbRef) _fbRef.set(stateToFb(state)).catch(e => console.warn('Firebase save:', e));
   updateSyncDot('saving');
 }
 
-// Listener temps réel
-_fbRef.on('value', snapshot => {
-  const remote = fbToState(snapshot.val() || {});
+function setupFirebaseSync(dsId) {
+  // Détache l'ancien listener
+  if (_fbRef && _fbListener) _fbRef.off('value', _fbListener);
+  _fbInitDone = false;
+  _fbRef = _db.ref('datasets/' + dsId + '/state');
 
-  if (!_fbInitDone) {
-    _fbInitDone = true;
-    // Première connexion : fusionner local + Firebase et uploader le résultat
+  _fbListener = snapshot => {
+    const remote = fbToState(snapshot.val() || {});
+    if (!_fbInitDone) {
+      _fbInitDone = true;
+      const merged = mergeStates(state, remote);
+      state = merged;
+      localStorage.setItem(currentStorageKey(), JSON.stringify(state));
+      _lastOwnPush = Date.now();
+      _fbRef.set(stateToFb(state)).catch(() => {});
+      applyFilters();
+      updateSyncDot('ok');
+      return;
+    }
+    const isOwnEcho = (Date.now() - _lastOwnPush) < 3000;
     const merged = mergeStates(state, remote);
-    state = merged;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    _lastOwnPush = Date.now();
-    _fbRef.set(stateToFb(state)).catch(() => {});
-    applyFilters();
+    const changed = JSON.stringify(merged) !== JSON.stringify(state);
+    if (changed) {
+      state = merged;
+      localStorage.setItem(currentStorageKey(), JSON.stringify(state));
+      applyFilters();
+      if (!isOwnEcho) showToast('Ton ami a mis à jour des entreprises');
+    }
     updateSyncDot('ok');
-    return;
-  }
-
-  // Echo de notre propre push (< 3 s) → on ignore le toast mais on re-render si besoin
-  const isOwnEcho = (Date.now() - _lastOwnPush) < 3000;
-  const merged = mergeStates(state, remote);
-  const changed = JSON.stringify(merged) !== JSON.stringify(state);
-
-  if (changed) {
-    state = merged;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    applyFilters();
-    if (!isOwnEcho) showToast('Ton ami a mis à jour des entreprises');
-  }
-  updateSyncDot('ok');
-}, err => { updateSyncDot('err'); });
+  };
+  _fbRef.on('value', _fbListener, () => updateSyncDot('err'));
+}
 
 function updateSyncDot(status) {
   const dot = document.getElementById('sync-dot');
@@ -956,14 +1037,18 @@ function showToast(msg) {
   t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
 }
 
+loadDsMeta();
 loadState();
+setupFirebaseSync(currentDsId);
+populateDsSelect();
 populatePaeFilter();
 applyFilters();
 
 
 function populatePaeFilter() {
   const sel = document.getElementById('filter-pae');
-  const paes = [...new Set(COMPANIES.map(c => c.nom_du_pae).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Tous les groupes</option>';
+  const paes = [...new Set(ACTIVE_COMPANIES.map(c => c.nom_du_pae).filter(Boolean))].sort();
   paes.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p; opt.textContent = p;
@@ -984,13 +1069,11 @@ function filterByCard(status) {
 }
 
 function applyFilters() {
-  const q   = document.getElementById('search').value.toLowerCase();
-  const pae = document.getElementById('filter-pae').value;
+  const q = document.getElementById('search').value.toLowerCase();
 
-  filteredData = COMPANIES.filter(c => {
+  filteredData = ACTIVE_COMPANIES.filter(c => {
     const s = state[getKey(c)] || {};
     const status = s.status || 'pending';
-    if (pae && c.nom_du_pae !== pae) return false;
     if (activeCardFilter && status !== activeCardFilter) return false;
     if (q) {
       const hay = [c.nom, c.activite, c.localite, c.nom_du_pae, c.telephone].join(' ').toLowerCase();
@@ -1023,7 +1106,7 @@ function renderTable() {
   const empty = document.getElementById('empty-state');
   const info  = document.getElementById('results-info');
 
-  info.innerHTML = `<b>${filteredData.length}</b> résultats — <b>${COMPANIES.length}</b> entreprises au total`;
+  info.innerHTML = `<b>${filteredData.length}</b> résultats — <b>${ACTIVE_COMPANIES.length}</b> entreprises au total`;
 
   if (filteredData.length === 0) {
     tbody.innerHTML = '';
@@ -1115,7 +1198,7 @@ function updateRow(key) {
   // Si filtre actif et le nouveau statut ne correspond plus, retirer la ligne
   if (activeCardFilter && status !== activeCardFilter) {
     filteredData = filteredData.filter(c => getKey(c) !== key);
-    document.getElementById('results-info').innerHTML = `<b>${filteredData.length}</b> résultats — <b>${COMPANIES.length}</b> entreprises au total`;
+    document.getElementById('results-info').innerHTML = `<b>${filteredData.length}</b> résultats — <b>${ACTIVE_COMPANIES.length}</b> entreprises au total`;
     if (filteredData.length === 0) document.getElementById('empty-state').style.display = 'block';
     tr.remove();
     updateStats();
@@ -1178,15 +1261,16 @@ function toggleInterested(el) {
 }
 
 function updateStats() {
-  const total  = COMPANIES.length;
+  const total  = ACTIVE_COMPANIES.length;
   const counts = { pending:0, done:0, interested:0, skip:0 };
-  COMPANIES.forEach(c => {
+  ACTIVE_COMPANIES.forEach(c => {
     const s = state[getKey(c)] || {};
     counts[s.status || 'pending']++;
   });
   const treated = counts.done + counts.interested + counts.skip;
   const pct     = Math.round(treated / total * 100);
 
+  document.getElementById('header-ds-name').textContent = dsMeta[currentDsId]?.name || 'Prospection';
   document.getElementById('progress-bar').style.width = pct + '%';
   document.getElementById('header-pct').textContent = pct + '%';
   document.getElementById('progress-label-right').textContent = `${treated} / ${total}`;
@@ -1197,7 +1281,7 @@ function updateStats() {
 }
 
 function exportCSV() {
-  const toExport = filteredData.length > 0 ? filteredData : COMPANIES;
+  const toExport = filteredData.length > 0 ? filteredData : ACTIVE_COMPANIES;
   const cols = ['nom','activite','localite','nom_du_pae','telephone','fax','forme_juridique','tva','adresse','cp','statut'];
   const rows = [cols.join(';')];
   toExport.forEach(c => {
@@ -1225,6 +1309,220 @@ function resetAll() {
   document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
   applyFilters();
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DATASET MANAGEMENT
+// ══════════════════════════════════════════════════════════════════════════════
+
+function populateDsSelect() {
+  const sel = document.getElementById('ds-select');
+  sel.innerHTML = '';
+  Object.entries(dsMeta).forEach(([id, meta]) => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = meta.name;
+    if (id === currentDsId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function switchDataset(dsId) {
+  if (dsId === currentDsId) return;
+  currentDsId = dsId;
+
+  // Charge les données du dataset
+  if (dsId === 'igretec') {
+    ACTIVE_COMPANIES = COMPANIES;
+  } else {
+    try {
+      const raw = localStorage.getItem(DS_DATA_PFX + dsId);
+      ACTIVE_COMPANIES = raw ? JSON.parse(raw) : [];
+    } catch(e) { ACTIVE_COMPANIES = []; }
+  }
+
+  // Recharge état + Firebase
+  state = {};
+  loadState();
+  setupFirebaseSync(dsId);
+
+  // Reset UI
+  activeCardFilter = '';
+  document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+  document.getElementById('search').value = '';
+  populatePaeFilter();
+  applyFilters();
+  showToast('Dataset : ' + dsMeta[dsId].name);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// CSV IMPORT
+// ──────────────────────────────────────────────────────────────────────────────
+
+
+const COL_HINTS = {
+  nom:       ['nom', 'name', 'entreprise', 'company', 'raison', 'société', 'societe', 'dénomination'],
+  activite:  ['activite', 'activité', 'activity', 'secteur', 'sector', 'catégorie', 'categorie', 'type'],
+  localite:  ['localite', 'localité', 'ville', 'city', 'commune', 'location', 'adresse', 'address'],
+  telephone: ['telephone', 'téléphone', 'tel', 'phone', 'mobile', 'gsm', 'tél'],
+  tva:       ['tva', 'vat', 'bce', 'siret', 'siren', 'numéro', 'numero', 'n°', 'id'],
+  site_web:  ['site', 'web', 'url', 'website', 'homepage', 'www'],
+};
+
+function detectCol(headers, field) {
+  const hints = COL_HINTS[field];
+  const h = headers.map(s => s.toLowerCase().trim());
+  for (const hint of hints) {
+    const idx = h.findIndex(col => col.includes(hint));
+    if (idx !== -1) return headers[idx];
+  }
+  return '';
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return null;
+  const sep = lines[0].includes(';') ? ';' : ',';
+  const parseRow = line => {
+    const result = []; let cur = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === sep && !inQ) { result.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+    result.push(cur.trim());
+    return result;
+  };
+  const headers = parseRow(lines[0]).map(h => h.replace(/^"|"$/g, '').trim());
+  const rows = lines.slice(1).filter(l => l.trim()).map(l => {
+    const vals = parseRow(l);
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (vals[i] || '').replace(/^"|"$/g, '').trim(); });
+    return obj;
+  });
+  return { headers, rows };
+}
+
+function handleCSVFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    _csvParsed = parseCSV(e.target.result);
+    if (!_csvParsed || _csvParsed.rows.length === 0) {
+      showToast('Fichier CSV invalide ou vide');
+      return;
+    }
+    document.getElementById('drop-label').textContent = file.name + ' — ' + _csvParsed.rows.length + ' lignes';
+    document.getElementById('modal-drop').classList.add('has-file');
+    renderColMap(_csvParsed.headers);
+    renderPreview(_csvParsed);
+    document.getElementById('col-map-section').style.display = 'block';
+    document.getElementById('btn-confirm-import').disabled = false;
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function renderColMap(headers) {
+  const grid = document.getElementById('col-map-grid');
+  const fields = [
+    { key: 'nom',       label: 'Nom entreprise *' },
+    { key: 'activite',  label: 'Activité' },
+    { key: 'localite',  label: 'Localité / Ville' },
+    { key: 'telephone', label: 'Téléphone' },
+    { key: 'tva',       label: 'N° TVA / BCE' },
+    { key: 'site_web',  label: 'Site web' },
+  ];
+  grid.innerHTML = fields.map(f => {
+    const detected = detectCol(headers, f.key);
+    const opts = ['<option value="">— ignorer —</option>',
+      ...headers.map(h => `<option value="${h}" ${h === detected ? 'selected' : ''}>${h}</option>`)
+    ].join('');
+    return `<div class="col-map-item"><label>${f.label}</label><select id="map-${f.key}">${opts}</select></div>`;
+  }).join('');
+}
+
+function renderPreview(parsed) {
+  const table = document.getElementById('preview-table');
+  const sample = parsed.rows.slice(0, 3);
+  table.innerHTML = `<thead><tr>${parsed.headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${sample.map(r => `<tr>${parsed.headers.map(h => `<td>${r[h] || ''}</td>`).join('')}</tr>`).join('')}</tbody>`;
+}
+
+function confirmImport() {
+  if (!_csvParsed) return;
+  const name = document.getElementById('ds-name-input').value.trim() || ('Import ' + new Date().toLocaleDateString('fr'));
+  const mapField = f => document.getElementById('map-' + f)?.value || '';
+
+  const companies = _csvParsed.rows.map(row => ({
+    nom:        row[mapField('nom')]       || '',
+    activite:   row[mapField('activite')]  || '',
+    localite:   row[mapField('localite')]  || '',
+    telephone:  row[mapField('telephone')] || '',
+    tva:        row[mapField('tva')]       || '',
+    site_web:   row[mapField('site_web')]  || '',
+  })).filter(c => c.nom);
+
+  if (companies.length === 0) { showToast('Aucune ligne avec un nom valide trouvée'); return; }
+
+  const dsId = 'ds_' + Date.now();
+  dsMeta[dsId] = { name, isBuiltIn: false };
+  saveDsMeta();
+  localStorage.setItem(DS_DATA_PFX + dsId, JSON.stringify(companies));
+
+  closeImportModal();
+  populateDsSelect();
+  document.getElementById('ds-select').value = dsId;
+  switchDataset(dsId);
+  showToast(`"${name}" importé — ${companies.length} entreprises`);
+}
+
+function openImportModal() {
+  _csvParsed = null;
+  document.getElementById('ds-name-input').value = '';
+  document.getElementById('drop-label').textContent = 'Clique pour choisir un fichier .csv';
+  document.getElementById('modal-drop').classList.remove('has-file');
+  document.getElementById('col-map-section').style.display = 'none';
+  document.getElementById('btn-confirm-import').disabled = true;
+  document.getElementById('csv-file-input').value = '';
+  document.getElementById('import-modal').style.display = 'flex';
+}
+
+function closeImportModal() {
+  document.getElementById('import-modal').style.display = 'none';
+}
 </script>
+
+<!-- IMPORT CSV MODAL -->
+<div id="import-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeImportModal()">
+  <div class="modal-box">
+    <p class="modal-title">Importer un dataset CSV</p>
+    <p class="modal-sub">Importe un fichier CSV scrappé. Les colonnes seront détectées automatiquement.</p>
+
+    <label class="modal-label">Nom du dataset</label>
+    <input id="ds-name-input" class="modal-input" type="text" placeholder="Ex: LinkedIn Liège, Infobel B2B…" style="margin-bottom:20px">
+
+    <label class="modal-label">Fichier CSV</label>
+    <div id="modal-drop" class="modal-drop" onclick="document.getElementById('csv-file-input').click()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 8px;display:block"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span id="drop-label">Clique pour choisir un fichier .csv</span>
+    </div>
+    <input id="csv-file-input" type="file" accept=".csv,.txt" style="display:none" onchange="handleCSVFile(event)">
+
+    <div id="col-map-section" style="display:none">
+      <p class="modal-label" style="margin-top:20px">Correspondance des colonnes</p>
+      <div class="col-map-grid" id="col-map-grid"></div>
+      <div style="margin-top:16px">
+        <p class="modal-label">Aperçu (3 premières lignes)</p>
+        <div style="overflow-x:auto"><table class="preview-table" id="preview-table"></table></div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeImportModal()">Annuler</button>
+      <button class="btn-modal-ok" id="btn-confirm-import" onclick="confirmImport()" disabled>Importer</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
