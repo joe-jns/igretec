@@ -27,6 +27,13 @@ let _csvParsed = null;
 let focusMode  = false;
 let focusIndex = 0;
 let lastModifiedKey = null;
+function loadLastModified() {
+  lastModifiedKey = localStorage.getItem('last_modified_' + currentDsId) || null;
+}
+function saveLastModified(key) {
+  lastModifiedKey = key;
+  localStorage.setItem('last_modified_' + currentDsId, key);
+}
 
 const BADGE_CONFIG = {
   pending:    { label: 'À traiter',       dot: true },
@@ -63,7 +70,7 @@ let _fbInitDone    = false;
 let _lastOwnPush   = 0;
 
 function saveState(key) {
-  if (key) lastModifiedKey = key;
+  if (key) saveLastModified(key);
   localStorage.setItem(currentStorageKey(), JSON.stringify(state));
   _lastOwnPush = Date.now();
   if (_fbRef) _fbRef.set(stateToFb(state)).catch(e => console.warn('Firebase save:', e));
@@ -219,11 +226,13 @@ function showToast(msg) {
 
 loadDsMeta();
 loadState();
+loadLastModified();
 setupFirebaseSync(currentDsId);
 setupPresence();
 populateDsSelect();
 populatePaeFilter();
 applyFilters();
+updateResumeBtn();
 
 
 function populatePaeFilter() {
