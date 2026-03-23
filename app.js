@@ -280,6 +280,7 @@ function applyFilters() {
 
   filteredData = ACTIVE_COMPANIES.filter(c => {
     const s = state[getKey(c)] || {};
+    if (s.deleted) return false;
     const status = s.status || 'pending';
     if (activeCardFilter && status !== activeCardFilter) return false;
     if (q) {
@@ -373,6 +374,19 @@ function renderTable() {
           </button>
         </div>
       </td>
+      <td class="col-menu">
+        <div class="row-menu-wrap">
+          <button class="menu-dots-btn" onclick="toggleRowMenu(event, this)" data-tip="Plus d'options">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+          </button>
+          <div class="row-dropdown">
+            <button class="row-dropdown-item danger" data-key="${esc(key)}" onclick="deleteCompany(this)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M19,6l-1,14H6L5,6"/><path d="M10,11v6"/><path d="M14,11v6"/><path d="M9,6V4h6v2"/></svg>
+              Supprimer
+            </button>
+          </div>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -456,6 +470,27 @@ function toggleSkip(el) {
   saveState(key);
   updateRow(key);
 }
+
+function toggleRowMenu(e, btn) {
+  e.stopPropagation();
+  const menu = btn.nextElementSibling;
+  const isOpen = menu.classList.contains('open');
+  document.querySelectorAll('.row-dropdown.open').forEach(m => m.classList.remove('open'));
+  if (!isOpen) menu.classList.add('open');
+}
+
+function deleteCompany(btn) {
+  const key = btn.dataset.key;
+  if (!confirm('Supprimer cette entreprise de la liste ?')) return;
+  if (!state[key]) state[key] = {};
+  state[key].deleted = true;
+  saveState();
+  applyFilters();
+}
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.row-dropdown.open').forEach(m => m.classList.remove('open'));
+});
 
 function toggleInterested(el) {
   const key = el.dataset.key;
