@@ -181,21 +181,41 @@ function setupFirebaseSync(dsId) {
 }
 
 function syncSharedDatasets() {
-  _db.ref('shared_datasets').on('value', snap => {
-    const remote = snap.val() || {};
-    let added = 0;
-    for (const [id, val] of Object.entries(remote)) {
-      if (!val || !val.name || !val.data) continue;
-      if (dsMeta[id]) continue; // déjà connu
-      dsMeta[id] = { name: val.name, isBuiltIn: false };
-      localStorage.setItem(DS_DATA_PFX + id, JSON.stringify(val.data));
-      added++;
+  // Écoute tous les datasets Firebase — même nœud que le state (règles déjà permissives)
+  _db.ref('datasets').on('child_added', snap => {
+    const id = snap.key;
+    if (!id || id === 'igretec' || dsMeta[id]) return; // déjà connu
+    const val = snap.val() || {};
+    if (!val.meta || !val.meta.name || !val.data) return;
+    dsMeta[id] = { name: val.meta.name, isBuiltIn: false };
+    localStorage.setItem(DS_DATA_PFX + id, JSON.stringify(val.data));
+    saveDsMeta();
+    populateDsSelect();
+    showToast(`Nouveau dataset reçu : "${val.meta.name}"`);
+  });
+
+  _db.ref('datasets').on('child_removed', snap => {
+    const id = snap.key;
+    if (!id || id === 'igretec' || !dsMeta[id] || dsMeta[id].isBuiltIn) return;
+    const dsName = dsMeta[id].name;
+    delete dsMeta[id];
+    saveDsMeta();
+    localStorage.removeItem(DS_DATA_PFX + id);
+    localStorage.removeItem(DS_STATE_PFX + id);
+    localStorage.removeItem('last_modified_' + id);
+    if (currentDsId === id) {
+      currentDsId = 'igretec';
+      ACTIVE_COMPANIES = COMPANIES;
+      state = {};
+      loadState();
+      setupFirebaseSync('igretec');
+      activeCardFilter = '';
+      document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
     }
-    if (added > 0) {
-      saveDsMeta();
-      populateDsSelect();
-      showToast(`${added} nouveau${added > 1 ? 'x' : ''} dataset${added > 1 ? 's' : ''} reçu${added > 1 ? 's' : ''}`);
-    }
+    populateDsSelect();
+    populatePaeFilter();
+    applyFilters();
+    showToast(`Dataset "${dsName}" supprimé par ton ami`);
   });
 }
 
@@ -786,6 +806,56 @@ function populateDsSelect() {
     if (id === currentDsId) opt.selected = true;
     sel.appendChild(opt);
   });
+  updateDeleteDsBtn();
+}
+
+function updateDeleteDsBtn() {
+  const btn = document.getElementById('btn-del-ds');
+  if (!btn) return;
+  const isBuiltIn = dsMeta[currentDsId]?.isBuiltIn;
+  btn.disabled = !!isBuiltIn;
+  btn.style.opacity = isBuiltIn ? '0.3' : '';
+  btn.dataset.tip = isBuiltIn ? 'Le dataset par défaut ne peut pas être supprimé' : 'Supprimer ce dataset';
+}
+
+function confirmDeleteDataset() {
+  if (dsMeta[currentDsId]?.isBuiltIn) return;
+  const name = dsMeta[currentDsId]?.name || 'ce dataset';
+  showConfirm(
+    'Supprimer le dataset',
+    `Le dataset <b>${name}</b> sera supprimé pour toi et ton ami. Cette action est irréversible.`,
+    'Supprimer',
+    deleteCurrentDataset
+  );
+}
+
+function deleteCurrentDataset() {
+  const dsId = currentDsId;
+  if (dsMeta[dsId]?.isBuiltIn) return;
+  const dsName = dsMeta[dsId]?.name || dsId;
+
+  // Nettoyage local
+  delete dsMeta[dsId];
+  saveDsMeta();
+  localStorage.removeItem(DS_DATA_PFX + dsId);
+  localStorage.removeItem(DS_STATE_PFX + dsId);
+  localStorage.removeItem('last_modified_' + dsId);
+
+  // Nettoyage Firebase
+  _db.ref('datasets/' + dsId).remove().catch(() => {});
+
+  // Bascule sur igretec
+  currentDsId = 'igretec';
+  ACTIVE_COMPANIES = COMPANIES;
+  state = {};
+  loadState();
+  setupFirebaseSync('igretec');
+  activeCardFilter = '';
+  document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+  populateDsSelect();
+  populatePaeFilter();
+  applyFilters();
+  showToast(`"${dsName}" supprimé`);
 }
 
 function switchDataset(dsId) {
@@ -811,6 +881,7 @@ function switchDataset(dsId) {
   activeCardFilter = '';
   document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
   document.getElementById('search').value = '';
+  updateDeleteDsBtn();
   populatePaeFilter();
   applyFilters();
   showToast('Dataset : ' + dsMeta[dsId].name);
@@ -932,13 +1003,16 @@ function confirmImport() {
   saveDsMeta();
   localStorage.setItem(DS_DATA_PFX + dsId, JSON.stringify(companies));
 
-  // Partage le dataset avec l'ami via Firebase
-  _db.ref('shared_datasets/' + dsId).set({ name, data: companies })
-    .catch(e => console.warn('Firebase dataset sync:', e));
+  // Partage le dataset avec l'ami via Firebase (même nœud que le state)
+  _db.ref('datasets/' + dsId + '/meta').set({ name })
+    .catch(e => console.warn('Firebase meta sync:', e));
+  _db.ref('datasets/' + dsId + '/data').set(companies)
+    .catch(e => console.warn('Firebase data sync:', e));
 
   closeImportModal();
   populateDsSelect();
   document.getElementById('ds-select').value = dsId;
+  updateDeleteDsBtn();
   switchDataset(dsId);
   showToast(`"${name}" importé — ${companies.length} entreprises`);
 }

@@ -354,6 +354,14 @@ select.ds-select {
   transition: all 0.15s;
 }
 .btn-new-ds:hover { border-color: var(--blue); color: var(--blue); }
+.btn-del-ds {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-del-ds:hover:not(:disabled) { border-color: var(--red); color: var(--red); background: var(--red-bg); }
+.btn-del-ds:disabled { cursor: default; }
 
 /* Modal import CSV */
 .modal-overlay {
