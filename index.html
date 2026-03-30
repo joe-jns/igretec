@@ -293,12 +293,25 @@
       </div>
     </div>
 
-    <label class="modal-label">Téléphone</label>
-    <div class="enrich-field-row" style="margin-bottom:14px">
-      <input id="enrich-tel" class="modal-input" type="tel" placeholder="+32 …">
-      <button class="enrich-copy-btn" onclick="copyEnrichField('enrich-tel')" data-tip="Copier">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-      </button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div>
+        <label class="modal-label">Téléphone</label>
+        <div class="enrich-field-row">
+          <input id="enrich-tel" class="modal-input" type="tel" placeholder="+32 …">
+          <button class="enrich-copy-btn" onclick="copyEnrichField('enrich-tel')" data-tip="Copier">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+      </div>
+      <div>
+        <label class="modal-label">Email</label>
+        <div class="enrich-field-row">
+          <input id="enrich-email" class="modal-input" type="email" placeholder="jean@…">
+          <button class="enrich-copy-btn" onclick="copyEnrichField('enrich-email')" data-tip="Copier">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
 
     <label class="modal-label">Notes</label>
