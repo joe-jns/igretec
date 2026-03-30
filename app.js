@@ -256,11 +256,13 @@ function mergeStates(base, incoming) {
     const b = incoming[key] || {};
     const aP = priority[a.status] ?? -1;
     const bP = priority[b.status] ?? -1;
+    const enrich = b.enrich || a.enrich || undefined;
     merged[key] = {
       status: bP > aP ? (b.status || 'pending') : (a.status || 'pending'),
       note: (b.note && (!a.note || b.note.length > a.note.length)) ? b.note : (a.note || ''),
     };
-    if ((!merged[key].status || merged[key].status === 'pending') && !merged[key].note) delete merged[key];
+    if (enrich) merged[key].enrich = enrich;
+    if ((!merged[key].status || merged[key].status === 'pending') && !merged[key].note && !merged[key].enrich) delete merged[key];
   }
   return merged;
 }
@@ -341,7 +343,8 @@ function filterByCard(status) {
   } else {
     activeCardFilter = status;
     document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
-    document.getElementById('card-' + status).classList.add('active');
+    const card = document.getElementById('card-' + status);
+    if (card) card.classList.add('active');
   }
   applyFilters();
 }
@@ -353,7 +356,9 @@ function applyFilters(keepPage = false) {
     const s = state[getKey(c)] || {};
     if (s.deleted) return false;
     const status = s.status || 'pending';
-    if (activeCardFilter && status !== activeCardFilter) return false;
+    if (activeCardFilter === 'enrich') {
+      if (!s.enrich || !Object.values(s.enrich).some(v => v)) return false;
+    } else if (activeCardFilter && status !== activeCardFilter) return false;
     if (q) {
       const hay = [c.nom, c.activite, c.localite, c.nom_du_pae, c.telephone].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
@@ -418,6 +423,9 @@ function renderTable() {
       </td>
       <td class="col-nom">
         <span class="nom-text" onclick="searchCompany(this, '${esc(key)}')" title="Rechercher sur Google">${esc(c.nom || '—')}</span>
+        ${(s.enrich && (s.enrich.prenom || s.enrich.nom)) ? `<span class="contact-sub">${esc([s.enrich.prenom, s.enrich.nom].filter(Boolean).join(' '))}</span>` : ''}
+        ${(s.enrich && s.enrich.site) ? `<a href="${esc(s.enrich.site)}" target="_blank" class="enrich-row-link" data-tip="Ouvrir le site"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></a>` : ''}
+        ${(s.enrich && s.enrich.linkedin) ? `<a href="${esc(s.enrich.linkedin)}" target="_blank" class="enrich-row-link enrich-row-link-li" data-tip="Ouvrir LinkedIn"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></a>` : ''}
       </td>
       <td class="col-activite">${esc(c.activite || '—')}</td>
       <td class="col-localite">${esc(c.localite || '—')}</td>
@@ -446,6 +454,13 @@ function renderTable() {
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
             Pas pertinent
+          </button>
+          <button class="enrich-btn ${s.enrich ? 'enriched' : ''}" data-key="${esc(key)}" onclick="openEnrichModal('${esc(key)}')" data-tip="Enrichir les données de contact">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+              <line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/>
+            </svg>
+            Enrichir
           </button>
         </div>
       </td>
@@ -587,7 +602,7 @@ function toggleInterested(el) {
 function updateStats() {
   const total  = ACTIVE_COMPANIES.filter(c => !(state[getKey(c)] || {}).deleted).length;
   const counts = { pending:0, done:0, interested:0, skip:0 };
-  let myCount = 0, amiCount = 0;
+  let myCount = 0, amiCount = 0, enrichCount = 0;
   ACTIVE_COMPANIES.forEach(c => {
     const s = state[getKey(c)] || {};
     if (s.deleted) return;
@@ -597,6 +612,7 @@ function updateStats() {
       if (s.by === MY_UID) myCount++;
       else if (s.by) amiCount++;
     }
+    if (s.enrich && Object.values(s.enrich).some(v => v)) enrichCount++;
   });
   const treated = counts.done + counts.interested + counts.skip;
   const pct     = Math.round(treated / total * 100);
@@ -609,6 +625,7 @@ function updateStats() {
   document.getElementById('cnt-done').textContent       = counts.done;
   document.getElementById('cnt-interested').textContent = counts.interested;
   document.getElementById('cnt-skip').textContent       = counts.skip;
+  document.getElementById('cnt-enrich').textContent     = enrichCount;
 
   // Duo stats
   const duoEl = document.getElementById('duo-stats');
@@ -669,15 +686,17 @@ function launchConfetti() {
 
 function exportCSV() {
   const toExport = filteredData.length > 0 ? filteredData : ACTIVE_COMPANIES;
-  const cols = ['nom','activite','localite','nom_du_pae','telephone','fax','forme_juridique','tva','adresse','cp','statut'];
+  const cols = ['nom','activite','localite','nom_du_pae','telephone','fax','forme_juridique','tva','adresse','cp','statut','site_web','linkedin','prenom_contact','nom_contact','notes'];
   const rows = [cols.join(';')];
   toExport.forEach(c => {
     const key = getKey(c);
     const s   = state[key] || {};
+    const e   = s.enrich || {};
     rows.push([
       c.nom, c.activite, c.localite, c.nom_du_pae, c.telephone, c.fax,
       c.forme_juridique, c.tva, c.adresse, c.cp,
-      s.status || 'pending'
+      s.status || 'pending',
+      e.site || '', e.linkedin || '', e.prenom || '', e.nom || '', e.notes || ''
     ].map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(';'));
   });
   const label = activeCardFilter ? `_${activeCardFilter}` : '';
@@ -913,6 +932,73 @@ function openImportModal() {
 
 function closeImportModal() {
   document.getElementById('import-modal').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ENRICH MODAL
+// ══════════════════════════════════════════════════════════════════════════════
+
+let _enrichCurrentKey = null;
+
+function openEnrichModal(key) {
+  _enrichCurrentKey = key;
+  const s = state[key] || {};
+  const e = s.enrich || {};
+
+  // Find company name for the modal title
+  const company = ACTIVE_COMPANIES.find(c => getKey(c) === key);
+  document.getElementById('enrich-company-name').textContent = company ? company.nom : key;
+
+  document.getElementById('enrich-site').value     = e.site     || '';
+  document.getElementById('enrich-linkedin').value = e.linkedin || '';
+  document.getElementById('enrich-prenom').value   = e.prenom   || '';
+  document.getElementById('enrich-nom').value      = e.nom      || '';
+  document.getElementById('enrich-notes').value    = e.notes    || '';
+
+  document.getElementById('enrich-modal').style.display = 'flex';
+  document.getElementById('enrich-site').focus();
+}
+
+function saveEnrich() {
+  const key = _enrichCurrentKey;
+  if (!key) return;
+  if (!state[key]) state[key] = {};
+
+  const enrich = {
+    site:     document.getElementById('enrich-site').value.trim(),
+    linkedin: document.getElementById('enrich-linkedin').value.trim(),
+    prenom:   document.getElementById('enrich-prenom').value.trim(),
+    nom:      document.getElementById('enrich-nom').value.trim(),
+    notes:    document.getElementById('enrich-notes').value.trim(),
+  };
+
+  // Remove empty enrich object
+  const hasData = Object.values(enrich).some(v => v);
+  if (hasData) {
+    state[key].enrich = enrich;
+  } else {
+    delete state[key].enrich;
+  }
+
+  saveState(key);
+
+  // Update enrich button style in row
+  const btn = document.querySelector(`.enrich-btn[data-key="${key.replace(/"/g, '\\"')}"]`);
+  if (btn) btn.classList.toggle('enriched', hasData);
+
+  closeEnrichModal();
+  showToast(hasData ? 'Données enregistrées' : 'Données effacées');
+}
+
+function closeEnrichModal() {
+  document.getElementById('enrich-modal').style.display = 'none';
+  _enrichCurrentKey = null;
+}
+
+function copyEnrichField(id) {
+  const val = document.getElementById(id)?.value?.trim();
+  if (!val) return;
+  navigator.clipboard.writeText(val).then(() => showToast('Copié !'));
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

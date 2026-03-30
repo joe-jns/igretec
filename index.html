@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Igretec — Prospection PAE</title>
+<title>Prospection - Dashboard</title>
 <script src="data.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -79,6 +79,14 @@
     </div>
     <div class="stat-num" id="cnt-skip">—</div>
     <div class="stat-sub">écartées</div>
+  </div>
+  <div class="stat-card s-enrich" id="card-enrich" onclick="filterByCard('enrich')">
+    <div class="stat-top">
+      <span class="stat-dot"></span>
+      <span class="stat-label">Enrichies</span>
+    </div>
+    <div class="stat-num" id="cnt-enrich">—</div>
+    <div class="stat-sub">données complétées</div>
   </div>
 </div>
 
@@ -248,6 +256,49 @@
 </div>
 
 <script src="app.js"></script>
+
+<!-- ENRICH MODAL -->
+<div id="enrich-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeEnrichModal()">
+  <div class="modal-box">
+    <p class="modal-title">Enrichir — <span id="enrich-company-name" style="font-weight:600;color:var(--blue)"></span></p>
+    <p class="modal-sub">Complète les informations de contact pour cette entreprise.</p>
+
+    <label class="modal-label">URL du site</label>
+    <div class="enrich-field-row" style="margin-bottom:14px">
+      <input id="enrich-site" class="modal-input" type="url" placeholder="https://…">
+      <button class="enrich-copy-btn" onclick="copyEnrichField('enrich-site')" data-tip="Copier">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+    </div>
+
+    <label class="modal-label">LinkedIn</label>
+    <div class="enrich-field-row" style="margin-bottom:14px">
+      <input id="enrich-linkedin" class="modal-input" type="url" placeholder="https://linkedin.com/in/…">
+      <button class="enrich-copy-btn" onclick="copyEnrichField('enrich-linkedin')" data-tip="Copier">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div>
+        <label class="modal-label">Prénom</label>
+        <input id="enrich-prenom" class="modal-input" type="text" placeholder="Jean">
+      </div>
+      <div>
+        <label class="modal-label">Nom</label>
+        <input id="enrich-nom" class="modal-input" type="text" placeholder="Dupont">
+      </div>
+    </div>
+
+    <label class="modal-label">Notes</label>
+    <textarea id="enrich-notes" class="modal-input modal-textarea" placeholder="Informations complémentaires…" rows="3"></textarea>
+
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeEnrichModal()">Annuler</button>
+      <button class="btn-modal-ok" onclick="saveEnrich()">Enregistrer</button>
+    </div>
+  </div>
+</div>
 
 <!-- IMPORT CSV MODAL -->
 <div id="import-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeImportModal()">

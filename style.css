@@ -178,6 +178,7 @@ header {
 .stat-card.s-done::after     { background: var(--green); }
 .stat-card.s-interested::after { background: var(--blue); }
 .stat-card.s-skip::after     { background: var(--red); }
+.stat-card.s-enrich::after   { background: #7c3aed; }
 
 .stat-card:hover { background: var(--surface2); }
 .stat-card:hover::after,
@@ -199,6 +200,7 @@ header {
 .s-done     .stat-dot { background: var(--green); }
 .s-interested .stat-dot { background: var(--blue); }
 .s-skip     .stat-dot { background: var(--red); }
+.s-enrich   .stat-dot { background: #7c3aed; }
 
 .stat-label {
   font-size: 0.7rem;
@@ -639,6 +641,92 @@ td.col-tel a:hover { opacity: 0.7; }
   background: var(--red-bg);
   font-weight: 700;
 }
+
+/* Enrich button */
+.enrich-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s cubic-bezier(0.16,1,0.3,1);
+}
+.enrich-btn:hover {
+  border-color: #7c3aed;
+  color: #7c3aed;
+  background: #f5f3ff;
+}
+.enrich-btn:active { transform: scale(0.96); }
+.enrich-btn.enriched {
+  border-color: rgba(124,58,237,0.3);
+  color: #7c3aed;
+  background: #f5f3ff;
+  font-weight: 700;
+}
+
+.modal-textarea {
+  resize: vertical;
+  min-height: 72px;
+  line-height: 1.5;
+  font-family: var(--font-ui);
+}
+
+/* Contact name under company */
+.contact-sub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+/* Clickable site/linkedin icons in row */
+.enrich-row-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  color: var(--muted);
+  text-decoration: none;
+  margin-left: 4px;
+  vertical-align: middle;
+  transition: color 0.12s, background 0.12s;
+}
+.enrich-row-link:hover { color: var(--blue); background: var(--blue-bg); }
+.enrich-row-link-li:hover { color: #0a66c2; background: #e8f0fe; }
+
+/* Enrich modal field row with copy button */
+.enrich-field-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.enrich-field-row .modal-input { flex: 1; margin-bottom: 0; }
+.enrich-copy-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.13s;
+}
+.enrich-copy-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-bg); }
 
 /* ── Duo stats ───────────────────────────────────────────────────── */
 .duo-stats {
