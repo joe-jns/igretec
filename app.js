@@ -79,6 +79,9 @@ function saveState(key) {
   if (_fbRef) _fbRef.set(stateToFb(state)).catch(e => console.warn('Firebase save:', e));
   updateSyncDot('saving');
   updateResumeBtn();
+  // Refresh stats page if open
+  const sp = document.getElementById('stats-page');
+  if (sp && sp.style.display !== 'none') renderStatsPage();
 }
 
 // Trouve le premier index non traité après le dernier traité dans filteredData
@@ -234,6 +237,9 @@ const MY_UID = (() => {
   return uid;
 })();
 
+let MY_NAME = localStorage.getItem('prospection_name') || '';
+let _usersMap = {}; // uid → name
+
 const CURSOR_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 function uidColor(uid) { let h=0; for(const c of uid) h=(h*31+c.charCodeAt(0))>>>0; return CURSOR_COLORS[h % CURSOR_COLORS.length]; }
 
@@ -295,12 +301,16 @@ function mergeStates(base, incoming) {
     const b = incoming[key] || {};
     const aP = priority[a.status] ?? -1;
     const bP = priority[b.status] ?? -1;
-    const enrich = b.enrich || a.enrich || undefined;
+    const winner = bP > aP ? b : a;
+    const enrich    = b.enrich    || a.enrich    || undefined;
+    const enrich_by = b.enrich_by || a.enrich_by || undefined;
     merged[key] = {
-      status: bP > aP ? (b.status || 'pending') : (a.status || 'pending'),
+      status: winner.status || 'pending',
       note: (b.note && (!a.note || b.note.length > a.note.length)) ? b.note : (a.note || ''),
     };
-    if (enrich) merged[key].enrich = enrich;
+    if (winner.by)  merged[key].by       = winner.by;
+    if (enrich)     merged[key].enrich    = enrich;
+    if (enrich_by)  merged[key].enrich_by = enrich_by;
     if ((!merged[key].status || merged[key].status === 'pending') && !merged[key].note && !merged[key].enrich) delete merged[key];
   }
   return merged;
@@ -358,10 +368,18 @@ loadLastModified();
 setupFirebaseSync(currentDsId);
 setupPresence();
 syncSharedDatasets();
+setupUsersSync();
 populateDsSelect();
 populatePaeFilter();
 applyFilters();
 updateResumeBtn();
+if (!MY_NAME) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', showProfileSetup);
+  } else {
+    showProfileSetup();
+  }
+}
 
 
 function populatePaeFilter() {
@@ -1033,6 +1051,296 @@ function closeImportModal() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// USERS / PROFILE / STATS
+// ══════════════════════════════════════════════════════════════════════════════
+
+function setupUsersSync() {
+  // Pousse mon nom dès qu'il est défini
+  if (MY_NAME) _db.ref('users/' + MY_UID).set({ name: MY_NAME });
+  // Écoute tous les profils
+  _db.ref('users').on('value', snap => {
+    _usersMap = {};
+    const data = snap.val() || {};
+    for (const [uid, v] of Object.entries(data)) {
+      if (v && v.name) _usersMap[uid] = v.name;
+    }
+  });
+}
+
+function showProfileSetup() {
+  document.getElementById('profile-setup-modal').style.display = 'flex';
+  document.getElementById('profile-name-input').focus();
+}
+
+function closeProfileSetup() {
+  document.getElementById('profile-setup-modal').style.display = 'none';
+}
+
+function saveProfile() {
+  const input = document.getElementById('profile-name-input');
+  const name = input.value.trim();
+  if (!name) { input.classList.add('input-error'); return; }
+  input.classList.remove('input-error');
+  MY_NAME = name;
+  localStorage.setItem('prospection_name', name);
+  _db.ref('users/' + MY_UID).set({ name });
+  document.getElementById('profile-setup-modal').style.display = 'none';
+  showToast(`Bienvenue, ${name} !`);
+}
+
+function openStatsModal() {
+  renderStatsPage();
+  switchStatsTab('vue-ensemble');
+  document.getElementById('stats-page').style.display = 'flex';
+  document.addEventListener('keydown', _statsEscHandler);
+}
+
+const RANKS = [
+  { name: 'Master',   min: 1000, color: '#dc2626', bg: '#fef2f2', border: 'rgba(220,38,38,0.25)',  icon: '♾️' },
+  { name: 'Diamond',  min: 800,  color: '#0ea5e9', bg: '#f0f9ff', border: 'rgba(14,165,233,0.25)', icon: '💎' },
+  { name: 'Platine',  min: 600,  color: '#7c3aed', bg: '#f5f3ff', border: 'rgba(124,58,237,0.25)', icon: '⚜️' },
+  { name: 'Gold',     min: 400,  color: '#d97706', bg: '#fffbeb', border: 'rgba(217,119,6,0.25)',  icon: '🥇' },
+  { name: 'Silver',   min: 200,  color: '#64748b', bg: '#f8fafc', border: 'rgba(100,116,139,0.25)',icon: '🥈' },
+  { name: 'Bronze',   min: 0,    color: '#92400e', bg: '#fff7ed', border: 'rgba(146,64,14,0.25)',  icon: '🥉' },
+];
+
+function getRank(treated) {
+  return RANKS.find(r => treated >= r.min) || RANKS[RANKS.length - 1];
+}
+
+function getNextRank(treated) {
+  const thresholds = [200, 400, 600, 800, 1000];
+  return thresholds.find(t => t > treated) || null;
+}
+
+function switchStatsTab(tab) {
+  ['vue-ensemble','prospection','enrichissement','leaderboard'].forEach(t => {
+    const el = document.getElementById('stats-tab-' + t);
+    el.style.display = t === tab ? 'flex' : 'none';
+    if (t === tab) {
+      el.querySelectorAll('*').forEach(c => { c.style.animation = 'none'; c.offsetHeight; c.style.animation = ''; });
+    }
+    document.getElementById('stab-' + t).classList.toggle('active', t === tab);
+  });
+}
+
+function closeStatsModal() {
+  document.getElementById('stats-page').style.display = 'none';
+  document.removeEventListener('keydown', _statsEscHandler);
+}
+
+function _statsEscHandler(e) { if (e.key === 'Escape') closeStatsModal(); }
+
+// Count-up animation
+function countUp(el, target, duration = 700) {
+  if (target === 0) { el.textContent = '0'; return; }
+  const start = performance.now();
+  const update = now => {
+    const p = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(ease * target);
+    if (p < 1) requestAnimationFrame(update);
+  };
+  requestAnimationFrame(update);
+}
+
+function renderStatsPage() {
+  const avatarColors = ['#c2410c','#1d4ed8','#15803d','#b91c1c','#7c3aed','#0369a1'];
+  const getColor = uid => { let h=0; for(const c of uid) h=(h*31+c.charCodeAt(0))>>>0; return avatarColors[h % avatarColors.length]; };
+  const getName  = uid => _usersMap[uid] || (uid === MY_UID ? (MY_NAME || 'Moi') : 'Utilisateur');
+  const getInit  = uid => (getName(uid)[0] || '?').toUpperCase();
+
+  // ── Collecte UIDs ─────────────────────────────────────────────────
+  const uids = new Set([MY_UID]);
+  for (const s of Object.values(state)) {
+    if (s.by) uids.add(s.by);
+    if (s.enrich_by) uids.add(s.enrich_by);
+  }
+  for (const uid of Object.keys(_usersMap)) uids.add(uid);
+  const uidList = [...uids];
+
+  // ── Calcul stats ──────────────────────────────────────────────────
+  const blank = () => ({ treated:0, done:0, interested:0, skip:0, enriched:0, emails:0, tels:0, contacts:0, sites:0, linkedins:0, notes:0 });
+  const us = {};
+  uidList.forEach(uid => us[uid] = blank());
+
+  const total = ACTIVE_COMPANIES.filter(c => !(state[getKey(c)] || {}).deleted).length;
+
+  for (const s of Object.values(state)) {
+    if (s.deleted) continue;
+    const st = s.status || 'pending';
+    if (s.by && us[s.by] && st !== 'pending') {
+      us[s.by].treated++;
+      us[s.by][st]++;
+    }
+    if (s.enrich && s.enrich_by && us[s.enrich_by]) {
+      const e = s.enrich;
+      us[s.enrich_by].enriched++;
+      if (e.email)           us[s.enrich_by].emails++;
+      if (e.tel)             us[s.enrich_by].tels++;
+      if (e.prenom || e.nom) us[s.enrich_by].contacts++;
+      if (e.site)            us[s.enrich_by].sites++;
+      if (e.linkedin)        us[s.enrich_by].linkedins++;
+      if (e.notes)           us[s.enrich_by].notes++;
+    }
+  }
+
+  const totalTreated    = uidList.reduce((a, u) => a + us[u].treated, 0);
+  const totalInterested = uidList.reduce((a, u) => a + us[u].interested, 0);
+  const totalEnriched   = uidList.reduce((a, u) => a + us[u].enriched, 0);
+  const globalPct       = total > 0 ? Math.round(totalTreated / total * 100) : 0;
+
+  // ── Dataset badge ─────────────────────────────────────────────────
+  document.getElementById('stats-dataset-badge').textContent = dsMeta[currentDsId]?.name || 'Dataset';
+
+  // ── KPI bar ───────────────────────────────────────────────────────
+  const kpis = [
+    { label: 'Entreprises total',   val: total,          color: 'var(--border-med)' },
+    { label: 'Traitées',            val: totalTreated,   color: 'var(--blue)' },
+    { label: 'Progression',         val: globalPct + '%',color: 'var(--green)', raw: globalPct },
+    { label: 'Intéressantes',       val: totalInterested,color: 'var(--amber)' },
+    { label: 'Fiches enrichies',    val: totalEnriched,  color: '#7c3aed' },
+  ];
+  document.getElementById('stats-kpi-bar').innerHTML = kpis.map(k =>
+    `<div class="stats-kpi">
+      <div class="stats-kpi-dot" style="background:${k.color}"></div>
+      <div class="stats-kpi-val" data-val="${k.raw ?? k.val}">${k.val}</div>
+      <div class="stats-kpi-label">${k.label}</div>
+    </div>`
+  ).join('');
+
+  // ── User cards ────────────────────────────────────────────────────
+  document.getElementById('stats-user-cards').innerHTML = uidList.map(uid => {
+    const s = us[uid];
+    const isMe = uid === MY_UID;
+    const color = getColor(uid);
+    const pct = total > 0 ? Math.round(s.treated / total * 100) : 0;
+    return `<div class="stats-user-card" style="--card-color:${color}">
+      <div class="stats-avatar" style="background:${color}">${getInit(uid)}</div>
+      <div class="stats-user-name">${getName(uid)}${isMe ? '<span class="stats-you-badge">toi</span>' : ''}</div>
+      <div class="stats-user-big" data-val="${s.treated}">0</div>
+      <div class="stats-user-sub">entreprises traitées</div>
+      <div class="stats-user-bar-wrap"><div class="stats-user-bar-fill" style="width:0%;background:${color}" data-pct="${pct}"></div></div>
+      <div class="stats-user-pct">${pct}% du total</div>
+    </div>`;
+  }).join('');
+
+  // ── Helper: section rows ──────────────────────────────────────────
+  const svgIcon = (path, extra='') =>
+    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${extra}>${path}</svg>`;
+
+  const headerRow = () =>
+    `<div class="stats-row stats-row-header">
+      <div class="stats-row-icon"></div>
+      <div class="stats-row-label"></div>
+      <div class="stats-row-vals">${uidList.map(u => `<div class="stats-row-val v-head" style="color:${getColor(u)}">${getName(u)}</div>`).join('')}</div>
+    </div>`;
+
+  const row = (label, icon, key, cls = '') =>
+    `<div class="stats-row">
+      <div class="stats-row-icon">${svgIcon(icon)}</div>
+      <div class="stats-row-label">${label}</div>
+      <div class="stats-row-vals">${uidList.map(u => {
+        const v = us[u][key];
+        return `<div class="stats-row-val ${cls} ${v === 0 ? 'v-zero' : ''}" data-val="${v}">0</div>`;
+      }).join('')}</div>
+    </div>`;
+
+  // ── Section Prospection ───────────────────────────────────────────
+  document.getElementById('stats-prospection').innerHTML =
+    headerRow() +
+    row('Traités au total',  '<polyline points="20,6 9,17 4,12"/>',                                                     'treated') +
+    row('Intéressants',      '<polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>', 'interested', 'v-blue') +
+    row('Pas pertinents',    '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',             'skip',       'v-red') +
+    row('Vus sans avis',     '<circle cx="12" cy="12" r="10"/><polyline points="12,8 12,12 14,14"/>',                   'done',       'v-green');
+
+  // ── Section Enrichissement ────────────────────────────────────────
+  document.getElementById('stats-enrichissement').innerHTML =
+    headerRow() +
+    row('Fiches enrichies',  '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/>', 'enriched', 'v-purple') +
+    row('Emails',            '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',  'emails') +
+    row('Téléphones',        '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>', 'tels') +
+    row('Contacts (prénom/nom)', '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>',              'contacts') +
+    row('Sites web',         '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>', 'sites') +
+    row('LinkedIn',          '<path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/>', 'linkedins');
+
+  // ── Leaderboard ───────────────────────────────────────────────────
+  renderLeaderboard(uidList, us, getColor, getName);
+
+  // ── Count-up animations ───────────────────────────────────────────
+  requestAnimationFrame(() => {
+    document.querySelectorAll('#stats-page [data-val]').forEach(el => {
+      const v = parseFloat(el.dataset.val);
+      if (!isNaN(v) && !el.dataset.val.includes('%')) countUp(el, v);
+    });
+    document.querySelectorAll('.stats-user-bar-fill').forEach(el => {
+      const pct = el.dataset.pct;
+      setTimeout(() => el.style.width = pct + '%', 50);
+    });
+    // Animate leaderboard rank bars
+    document.querySelectorAll('.lb-rank-fill').forEach(el => {
+      const pct = el.dataset.pct;
+      setTimeout(() => el.style.width = pct + '%', 80);
+    });
+  });
+}
+
+function renderLeaderboard(uidList, us, getColor, getName) {
+  const container = document.getElementById('stats-leaderboard');
+  if (!container) return;
+
+  // Sort by treated desc
+  const sorted = [...uidList].sort((a, b) => (us[b].treated - us[a].treated));
+
+  const posLabels = ['🥇', '🥈', '🥉'];
+  const isMe = uid => uid === MY_UID;
+
+  const html = sorted.map((uid, idx) => {
+    const s = us[uid];
+    const rank = getRank(s.treated);
+    const next = getNextRank(s.treated);
+    const color = getColor(uid);
+    const name = getName(uid);
+    const init = (name[0] || '?').toUpperCase();
+
+    // Progress toward next rank
+    const prevMin = rank.min;
+    const nextMin = next || prevMin;
+    const progress = next
+      ? Math.round(Math.min(((s.treated - prevMin) / (nextMin - prevMin)) * 100, 100))
+      : 100;
+    const remaining = next ? Math.max(next - s.treated, 0) : 0;
+    const nextRankObj = next ? getRank(next) : null;
+
+    const posLabel = idx < 3 ? `<span class="lb-pos-emoji">${posLabels[idx]}</span>` : `<span class="lb-pos-num">#${idx + 1}</span>`;
+
+    return `<div class="lb-card${isMe(uid) ? ' lb-card-me' : ''}" style="--lb-color:${color};--rank-color:${rank.color};--rank-bg:${rank.bg};--rank-border:${rank.border}">
+      <div class="lb-pos">${posLabel}</div>
+      <div class="lb-avatar" style="background:${color}">${init}</div>
+      <div class="lb-info">
+        <div class="lb-name">${name}${isMe(uid) ? '<span class="stats-you-badge">toi</span>' : ''}</div>
+        <div class="lb-rank-badge" style="color:${rank.color};background:${rank.bg};border-color:${rank.border}">
+          <span class="lb-rank-icon">${rank.icon}</span> ${rank.name}
+        </div>
+        <div class="lb-progress-wrap">
+          <div class="lb-rank-fill" style="background:${rank.color};width:0%" data-pct="${progress}"></div>
+        </div>
+        ${next
+          ? `<div class="lb-progress-label">${remaining} de plus pour <strong style="color:${nextRankObj.color}">${nextRankObj.icon} ${nextRankObj.name}</strong></div>`
+          : `<div class="lb-progress-label" style="color:${rank.color}">Rang maximum atteint !</div>`
+        }
+      </div>
+      <div class="lb-stats">
+        <div class="lb-stat"><span class="lb-stat-val" data-val="${s.treated}">0</span><span class="lb-stat-label">traitées</span></div>
+        <div class="lb-stat"><span class="lb-stat-val v-blue" data-val="${s.interested}">0</span><span class="lb-stat-label">intéressantes</span></div>
+        <div class="lb-stat"><span class="lb-stat-val v-purple" data-val="${s.enriched}">0</span><span class="lb-stat-label">enrichies</span></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `<div class="lb-list">${html}</div>`;
+}
+
 // ENRICH MODAL
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -1078,8 +1386,10 @@ function saveEnrich() {
   const hasData = Object.values(enrich).some(v => v);
   if (hasData) {
     state[key].enrich = enrich;
+    state[key].enrich_by = MY_UID;
   } else {
     delete state[key].enrich;
+    delete state[key].enrich_by;
   }
 
   saveState(key);

@@ -162,6 +162,13 @@
     Focus
   </button>
 
+  <button class="btn btn-stats" onclick="openStatsModal()" data-tip="Voir les statistiques par utilisateur">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
+    Stats
+  </button>
+
   <div class="status-cluster">
     <div id="presence-indicator" class="presence-dot presence-offline" data-tip="Ami hors ligne"></div>
     <span id="sync-dot" data-tip="Connexion en cours…" class="sync-dot"></span>
@@ -259,6 +266,93 @@
 </div>
 
 <script src="app.js"></script>
+
+<!-- PROFILE SETUP MODAL -->
+<div id="profile-setup-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeProfileSetup()">
+  <div class="modal-box" style="max-width:380px">
+    <p class="modal-title">Bienvenue 👋</p>
+    <p class="modal-sub">Entre ton prénom pour suivre tes statistiques et te différencier de ton ami.</p>
+    <label class="modal-label">Ton prénom</label>
+    <input id="profile-name-input" class="modal-input" type="text" placeholder="Jean" style="margin-bottom:20px"
+      onkeydown="if(event.key==='Enter')saveProfile()">
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeProfileSetup()">Passer</button>
+      <button class="btn-modal-ok" onclick="saveProfile()">Commencer</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATS PAGE -->
+<div id="stats-page" class="stats-page" style="display:none" role="dialog">
+
+  <!-- Sidebar -->
+  <aside class="stats-sidebar">
+    <div class="stats-sidebar-top">
+      <div class="stats-sidebar-title">Statistiques</div>
+      <div class="stats-sidebar-ds" id="stats-dataset-badge"></div>
+    </div>
+
+    <nav class="stats-nav">
+      <button class="stats-nav-item active" onclick="switchStatsTab('vue-ensemble')" id="stab-vue-ensemble">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Vue d'ensemble
+      </button>
+      <button class="stats-nav-item" onclick="switchStatsTab('prospection')" id="stab-prospection">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+        Prospection
+      </button>
+      <button class="stats-nav-item" onclick="switchStatsTab('enrichissement')" id="stab-enrichissement">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+        Enrichissement
+      </button>
+      <button class="stats-nav-item" onclick="switchStatsTab('leaderboard')" id="stab-leaderboard">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-3"/><path d="M12 21v-7"/><path d="M9 3h6"/><path d="M12 3v5"/><circle cx="12" cy="11" r="3"/></svg>
+        Leaderboard
+      </button>
+    </nav>
+
+    <div class="stats-sidebar-bottom">
+      <button class="stats-close-btn" onclick="closeStatsModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Fermer
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <div class="stats-main">
+
+    <!-- Tab: Vue d'ensemble -->
+    <div class="stats-tab" id="stats-tab-vue-ensemble">
+      <div class="stats-tab-header">Vue d'ensemble</div>
+      <div class="stats-kpi-bar" id="stats-kpi-bar"></div>
+      <div id="stats-user-cards" class="stats-user-cards"></div>
+    </div>
+
+    <!-- Tab: Prospection -->
+    <div class="stats-tab" id="stats-tab-prospection" style="display:none">
+      <div class="stats-tab-header">Prospection</div>
+      <div class="stats-section">
+        <div id="stats-prospection" class="stats-rows"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Enrichissement -->
+    <div class="stats-tab" id="stats-tab-enrichissement" style="display:none">
+      <div class="stats-tab-header">Enrichissement</div>
+      <div class="stats-section">
+        <div id="stats-enrichissement" class="stats-rows"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Leaderboard -->
+    <div class="stats-tab" id="stats-tab-leaderboard" style="display:none">
+      <div class="stats-tab-header">Leaderboard</div>
+      <div id="stats-leaderboard"></div>
+    </div>
+
+  </div>
+</div>
 
 <!-- ENRICH MODAL -->
 <div id="enrich-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeEnrichModal()">
