@@ -1285,17 +1285,35 @@ function renderStatsPage() {
   });
 }
 
+// ── Leaderboard hidden users ──────────────────────────────────────────────────
+let _lbHidden = new Set(JSON.parse(localStorage.getItem('lb_hidden') || '[]'));
+
+function lbHideUser(uid) {
+  _lbHidden.add(uid);
+  localStorage.setItem('lb_hidden', JSON.stringify([..._lbHidden]));
+  renderStatsPage();
+}
+
+function lbRestoreUser(uid) {
+  _lbHidden.delete(uid);
+  localStorage.setItem('lb_hidden', JSON.stringify([..._lbHidden]));
+  renderStatsPage();
+}
+
 function renderLeaderboard(uidList, us, getColor, getName) {
   const container = document.getElementById('stats-leaderboard');
   if (!container) return;
 
+  const visible = uidList.filter(u => !_lbHidden.has(u));
+  const hidden  = uidList.filter(u =>  _lbHidden.has(u));
+
   // Sort by treated desc
-  const sorted = [...uidList].sort((a, b) => (us[b].treated - us[a].treated));
+  const sorted = [...visible].sort((a, b) => (us[b].treated - us[a].treated));
 
   const posLabels = ['🥇', '🥈', '🥉'];
   const isMe = uid => uid === MY_UID;
 
-  const html = sorted.map((uid, idx) => {
+  const cardHtml = (uid, idx) => {
     const s = us[uid];
     const rank = getRank(s.treated);
     const next = getNextRank(s.treated);
@@ -1303,7 +1321,6 @@ function renderLeaderboard(uidList, us, getColor, getName) {
     const name = getName(uid);
     const init = (name[0] || '?').toUpperCase();
 
-    // Progress toward next rank
     const prevMin = rank.min;
     const nextMin = next || prevMin;
     const progress = next
@@ -1313,6 +1330,11 @@ function renderLeaderboard(uidList, us, getColor, getName) {
     const nextRankObj = next ? getRank(next) : null;
 
     const posLabel = idx < 3 ? `<span class="lb-pos-emoji">${posLabels[idx]}</span>` : `<span class="lb-pos-num">#${idx + 1}</span>`;
+    const deleteBtn = !isMe(uid)
+      ? `<button class="lb-delete-btn" onclick="lbHideUser('${uid}')" title="Retirer du leaderboard">
+           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+         </button>`
+      : '';
 
     return `<div class="lb-card${isMe(uid) ? ' lb-card-me' : ''}" style="--lb-color:${color};--rank-color:${rank.color};--rank-bg:${rank.bg};--rank-border:${rank.border}">
       <div class="lb-pos">${posLabel}</div>
@@ -1335,10 +1357,29 @@ function renderLeaderboard(uidList, us, getColor, getName) {
         <div class="lb-stat"><span class="lb-stat-val v-blue" data-val="${s.interested}">0</span><span class="lb-stat-label">intéressantes</span></div>
         <div class="lb-stat"><span class="lb-stat-val v-purple" data-val="${s.enriched}">0</span><span class="lb-stat-label">enrichies</span></div>
       </div>
+      ${deleteBtn}
     </div>`;
-  }).join('');
+  };
 
-  container.innerHTML = `<div class="lb-list">${html}</div>`;
+  const mainList = sorted.map((uid, idx) => cardHtml(uid, idx)).join('');
+
+  const hiddenSection = hidden.length > 0
+    ? `<div class="lb-hidden-section">
+        <div class="lb-hidden-title">Masqués (${hidden.length})</div>
+        ${hidden.map(uid => {
+          const color = getColor(uid);
+          const name = getName(uid);
+          const init = (name[0] || '?').toUpperCase();
+          return `<div class="lb-hidden-row">
+            <div class="lb-avatar lb-avatar-sm" style="background:${color}">${init}</div>
+            <span class="lb-hidden-name">${name}</span>
+            <button class="lb-restore-btn" onclick="lbRestoreUser('${uid}')">Restaurer</button>
+          </div>`;
+        }).join('')}
+      </div>`
+    : '';
+
+  container.innerHTML = `<div class="lb-list">${mainList}</div>${hiddenSection}`;
 }
 
 // ENRICH MODAL
