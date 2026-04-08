@@ -294,20 +294,32 @@ function setupPresence() {
 
 // Fusionne deux états : garde le plus "avancé" pour chaque entreprise
 function mergeStates(base, incoming) {
-  const priority = { interested: 3, skip: 2, done: 1, pending: 0 };
   const merged = Object.assign({}, base);
   for (const key of Object.keys(incoming)) {
     const a = base[key] || {};
     const b = incoming[key] || {};
-    const aP = priority[a.status] ?? -1;
-    const bP = priority[b.status] ?? -1;
-    const winner = bP > aP ? b : a;
+    // Si les deux ont un timestamp, on prend le plus récent
+    // Sinon on garde l'ancien comportement par priorité de statut
+    let winner;
+    if (a.ts && b.ts) {
+      winner = b.ts > a.ts ? b : a;
+    } else if (b.ts) {
+      winner = b;
+    } else if (a.ts) {
+      winner = a;
+    } else {
+      const priority = { interested: 3, skip: 2, done: 1, pending: 0 };
+      const aP = priority[a.status] ?? -1;
+      const bP = priority[b.status] ?? -1;
+      winner = bP > aP ? b : a;
+    }
     const enrich    = b.enrich    || a.enrich    || undefined;
     const enrich_by = b.enrich_by || a.enrich_by || undefined;
     merged[key] = {
       status: winner.status || 'pending',
-      note: (b.note && (!a.note || b.note.length > a.note.length)) ? b.note : (a.note || ''),
+      note: winner === b ? (b.note || a.note || '') : (a.note || b.note || ''),
     };
+    if (winner.ts)  merged[key].ts       = winner.ts;
     if (winner.by)  merged[key].by       = winner.by;
     if (enrich)     merged[key].enrich    = enrich;
     if (enrich_by)  merged[key].enrich_by = enrich_by;
@@ -597,6 +609,7 @@ function updateRow(key) {
 function setBy(key, status) {
   if (status && status !== 'pending') state[key].by = MY_UID;
   else delete state[key].by;
+  state[key].ts = Date.now();
 }
 
 function toggleCheck(el) {
@@ -1420,6 +1433,7 @@ function saveEnrich() {
     delete state[key].enrich;
     delete state[key].enrich_by;
   }
+  state[key].ts = Date.now();
 
   saveState(key);
 
